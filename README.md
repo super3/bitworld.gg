@@ -1,3 +1,7 @@
+[![Frontend](https://img.shields.io/github/actions/workflow/status/super3/bitworld.gg/frontend.yml?branch=main&label=frontend)](https://github.com/super3/bitworld.gg/actions/workflows/frontend.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/super3/bitworld.gg/test.yml?branch=main&label=tests)](https://github.com/super3/bitworld.gg/actions/workflows/test.yml)
+[![Coverage](https://coveralls.io/repos/github/super3/bitworld.gg/badge.svg?branch=main)](https://coveralls.io/github/super3/bitworld.gg?branch=main)
+
 # bitworld.gg
 
 A pixel life simulation where you live, explore, and make friends in a growing city.
