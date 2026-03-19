@@ -13,17 +13,16 @@ class ElevatorManager {
         this.boardedPlayers = [];
         this.elevatorSprites = [];
         for (let i = 0; i < scene.buildingManager.floors.length; i++) {
-            const y = scene.getFloorY(i) - GameConfig.GROUND_HEIGHT - GameConfig.SPRITE_HEIGHT + 3;
+            const elevatorY = GameConfig.getElevatorY(i);
 
-
-            const elevatorSprite = this.scene.add.image(elevatorX, y+25, 'Elevator_closed');
+            const elevatorSprite = this.scene.add.image(elevatorX, elevatorY, 'Elevator_closed');
             elevatorSprite.setDepth(1);
-            elevatorSprite.setScale(2); 
-            elevatorSprite.setOrigin(0.5, 1); 
+            elevatorSprite.setScale(2);
+            elevatorSprite.setOrigin(0.5, 1);
 
             //elevator backdrop
             const tileSize = 16;
-            const backdropRT = this.scene.add.renderTexture(elevatorX, y + 25+5, 32, 32);
+            const backdropRT = this.scene.add.renderTexture(elevatorX, elevatorY + 5, 32, 32);
             backdropRT.setOrigin(0.5, 1);
             backdropRT.setDepth(0);
             backdropRT.setScale(2); 
@@ -43,8 +42,7 @@ class ElevatorManager {
         }
 
         // Create elevator light sprite (starts on the current floor)
-        const lightY = scene.getFloorY(this.elevatorCurrentFloor) - GameConfig.GROUND_HEIGHT - GameConfig.SPRITE_HEIGHT + 3;
-        this.elevatorLight = scene.add.image(elevatorX, lightY+25, 'Elevator_light');
+        this.elevatorLight = scene.add.image(elevatorX, GameConfig.getElevatorY(this.elevatorCurrentFloor), 'Elevator_light');
         this.elevatorLight.setDepth(2); // Make sure it's above the elevator sprite
         this.elevatorLight.setScale(2); // Match elevator door scale if needed
         this.elevatorLight.setOrigin(0.5, 1); // Align with elevator door bottom
@@ -102,8 +100,7 @@ class ElevatorManager {
                 }
                 
                 // Move elevator light to match new floor
-                const newY = this.scene.getFloorY(this.elevatorCurrentFloor);                                
-                this.elevatorLight.y = newY - GameConfig.GROUND_HEIGHT - GameConfig.SPRITE_HEIGHT + 3+25;
+                this.elevatorLight.y = GameConfig.getElevatorY(this.elevatorCurrentFloor);
                 this.elevatorLightFlicker(1);
                 
                 if (count === steps) {
@@ -135,7 +132,7 @@ class ElevatorManager {
                 const exiting = this.boardedPlayers.filter(p => p.targetFloor === floor);
                 exiting.forEach(player => {
                     player.currentFloor = floor;
-                    player.y = this.scene.getFloorY(floor);
+                    player.y = GameConfig.getPlayerFloorY(floor);
                     player.targetFloor = null;
                     player.waitingForElevator = false;
                     player.spriteRef.setVisible(true);
@@ -217,7 +214,7 @@ class ElevatorManager {
         delay: 200,
         loop: true,
         callback: () => {
-            player.y = this.scene.getFloorY(floor);
+            player.y = GameConfig.getPlayerFloorY(floor);
             player.currentFloor = floor;
             player.targetFloor = null;
             player.waitingForElevator = false;
@@ -272,20 +269,19 @@ continueElevatorTravel(originalTarget, direction) {
         // Move to next floor
         this.elevatorCurrentFloor += direction;
         const floor = this.elevatorCurrentFloor;
-        const newY = this.scene.getFloorY(floor);
-        
+
         // Only flicker light off if not at target floor yet
         if (this.elevatorCurrentFloor !== originalTarget) {
             this.scene.time.delayedCall(500, () => {
                 this.elevatorLightFlicker(0);
             });
         }
-        
+
         // Move elevator light to match new floor
-        this.elevatorLight.y = newY - GameConfig.GROUND_HEIGHT - GameConfig.SPRITE_HEIGHT + 3+25;
+        this.elevatorLight.y = GameConfig.getElevatorY(floor);
         this.elevatorLightFlicker(1);
 
-        this.boardedPlayers.forEach(p => p.y = newY);
+        this.boardedPlayers.forEach(p => p.y = GameConfig.getPlayerFloorY(floor));
         const exiting = this.boardedPlayers.filter(p => p.targetFloor === floor);
         this.boardedPlayers = this.boardedPlayers.filter(p => p.targetFloor !== floor);
 

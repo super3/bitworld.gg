@@ -35,17 +35,15 @@ class BuildingManager {
     }
 
     calculateFloorPosition(index) {
-        const scaledHeight = GameConfig.BUILDING_HEIGHT * GameConfig.BUILDING_SCALE;
         return {
             x: GameConfig.WINDOW_WIDTH / 2,
-            y: GameConfig.WINDOW_HEIGHT - GameConfig.GROUND_HEIGHT - 
-               scaledHeight * (index + 1) + scaledHeight / 2
+            y: GameConfig.getBuildingFloorY(index)
         };
     }
 
     createRoof() {
-        const roofY = GameConfig.WINDOW_HEIGHT - GameConfig.GROUND_HEIGHT - 
-                     (GameConfig.BUILDING_HEIGHT * GameConfig.BUILDING_SCALE) * 4.3;
+        const roofY = GameConfig.WINDOW_HEIGHT - GameConfig.GROUND_HEIGHT -
+                     GameConfig.getScaledFloorHeight() * 4.3;
         this.roof = this.scene.add.image(GameConfig.WINDOW_WIDTH / 2, roofY, 'roof');
         this.roof.setScale(GameConfig.BUILDING_SCALE);
     }

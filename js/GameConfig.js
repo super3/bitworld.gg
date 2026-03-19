@@ -71,4 +71,27 @@ class GameConfig {
     
     // Elevator settings
     static ELEVATOR_SPEED = 1500; // milliseconds
+
+    // Floor position calculations (centralized to avoid duplication)
+    static getScaledFloorHeight() {
+        return GameConfig.BUILDING_HEIGHT * GameConfig.BUILDING_SCALE;
+    }
+
+    static getBuildingFloorY(floorIndex) {
+        const sh = GameConfig.getScaledFloorHeight();
+        return GameConfig.WINDOW_HEIGHT - GameConfig.GROUND_HEIGHT -
+               sh * (floorIndex + 1) + sh / 2;
+    }
+
+    static getPlayerFloorY(floorIndex) {
+        const sh = GameConfig.getScaledFloorHeight();
+        return GameConfig.WINDOW_HEIGHT - GameConfig.GROUND_HEIGHT -
+               (GameConfig.SPRITE_HEIGHT + 3) -
+               sh * floorIndex + sh / 2;
+    }
+
+    static getElevatorY(floorIndex) {
+        return GameConfig.getPlayerFloorY(floorIndex) -
+               GameConfig.GROUND_HEIGHT - GameConfig.SPRITE_HEIGHT + 28;
+    }
 } 

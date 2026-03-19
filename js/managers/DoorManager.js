@@ -4,7 +4,7 @@ function DoorManager(scene) {
 }
 
 DoorManager.prototype.addDoor = function (floor, x, width = 32, height = 60, doorType) {
-    const y = this.scene.getFloorY(floor)- GameConfig.GROUND_HEIGHT - 4;
+    const y = GameConfig.getPlayerFloorY(floor) - GameConfig.GROUND_HEIGHT - 4;
 
     const closed = this.scene.add.image(x, y, doorType+'_closed')
         .setOrigin(0.5, 1)

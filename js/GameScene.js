@@ -185,7 +185,7 @@ class GameScene extends Phaser.Scene {
     }
 
 createFloorWalls() {
-    const scaledHeight = GameConfig.BUILDING_HEIGHT * GameConfig.BUILDING_SCALE;
+    const scaledHeight = GameConfig.getScaledFloorHeight();
     const buildingCenterX = GameConfig.WINDOW_WIDTH / 2;
     const halfBuildingWidth = GameConfig.BUILDING_WIDTH / 2;
 
@@ -260,9 +260,7 @@ createFloorWalls() {
     }
 
     getFloorY(floorIndex) {
-    const scaledHeight = GameConfig.BUILDING_HEIGHT * GameConfig.BUILDING_SCALE;
-    return GameConfig.WINDOW_HEIGHT - (GameConfig.GROUND_HEIGHT)- (GameConfig.SPRITE_HEIGHT +3) - 
-            scaledHeight * (floorIndex) + scaledHeight / 2;
+        return GameConfig.getPlayerFloorY(floorIndex);
     }
 
 onElevatorZoneClicked(targetFloor, player) {
@@ -468,7 +466,7 @@ onElevatorZoneClicked(targetFloor, player) {
         const halfW = wall.width / 2;
         const halfH = wall.height / 2;
 
-        const isSameFloor = Math.abs(py - wy) < GameConfig.BUILDING_HEIGHT * GameConfig.BUILDING_SCALE * 0.6;
+        const isSameFloor = Math.abs(py - wy) < GameConfig.getScaledFloorHeight() * 0.6;
         const isOverlapping = (
             Math.abs(px - wx) < halfW + GameConfig.SPRITE_WIDTH * GameConfig.SCALE_FACTOR / 2 &&
             isSameFloor
@@ -499,7 +497,7 @@ onElevatorZoneClicked(targetFloor, player) {
     }
 
 getClickedFloorIndex(y) {
-    const scaledHeight = GameConfig.BUILDING_HEIGHT * GameConfig.BUILDING_SCALE;
+    const scaledHeight = GameConfig.getScaledFloorHeight();
 
     for (let i = this.buildingManager.floors.length - 1; i >= 0; i--) {
         const floorSprite = this.buildingManager.floors[i];
