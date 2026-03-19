@@ -6,5 +6,7 @@ module.exports = {
         'js/GameConfig.js',
         'js/PlayerStateMachine.js',
         'js/Player.js',
+        'js/managers/DoorManager.js',
+        'js/managers/ElevatorManager.js',
     ],
 };

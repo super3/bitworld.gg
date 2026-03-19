@@ -45,7 +45,7 @@ class GameScene extends Phaser.Scene {
             frameHeight: 16
         });
         this.currentFloor = 0;
-        this.elevator_X_position = 250;
+        this.elevator_X_position = GameConfig.ELEVATOR_X_POSITION;
     }
 
     create() {
@@ -82,7 +82,7 @@ class GameScene extends Phaser.Scene {
                     if (!this.selectedPlayer.is(PlayerState.WALKING)) {
                         this.selectedPlayer.forceState(PlayerState.AUTOMATED_IDLE);
                         this.selectedPlayer.idleTimer = 0;
-                        this.selectedPlayer.idleDuration = 1 + Math.random() * 2;
+                        this.selectedPlayer.idleDuration = GameConfig.NPC_IDLE_MIN + Math.random() * GameConfig.NPC_IDLE_RANGE;
                     }
                 }
 
@@ -142,26 +142,26 @@ class GameScene extends Phaser.Scene {
             // Set up movement boundaries based on floor
             if (player.currentFloor === 0) {
                 // Lobby has wider movement area (extend further right)
-                player.minX = 200;
-                player.maxX = 500;
+                player.minX = GameConfig.NPC_LOBBY_MIN_X;
+                player.maxX = GameConfig.NPC_MAX_X;
             } else {
                 // Other floors have narrower movement area
-                player.minX = 280;
-                player.maxX = 500;
+                player.minX = GameConfig.NPC_FLOOR_MIN_X;
+                player.maxX = GameConfig.NPC_MAX_X;
             }
 
             // Initialize automated movement properties
             player.direction = Math.random() > 0.5 ? 1 : -1;
             player.isAutomated = true;
-            player.automatedSpeed = GameConfig.CHAR_SPEED * 0.4; // Slower speed for automated NPCs (40% of normal)
+            player.automatedSpeed = GameConfig.CHAR_SPEED * GameConfig.NPC_SPEED_FACTOR;
             player.idleTimer = 0;
-            player.idleDuration = 2 + Math.random() * 3; // Random idle time between 2-5 seconds
+            player.idleDuration = GameConfig.NPC_INITIAL_IDLE_MIN + Math.random() * GameConfig.NPC_INITIAL_IDLE_RANGE;
 
             // Start in automated idle, then first movement will begin
             player.forceState(PlayerState.AUTOMATED_IDLE);
 
             // Start with a random initial movement
-            const initialDistance = 60 + Math.random() * 80;
+            const initialDistance = GameConfig.NPC_INITIAL_MOVE_MIN + Math.random() * GameConfig.NPC_INITIAL_MOVE_RANGE;
             player.targetX = Math.max(player.minX, Math.min(player.maxX, player.x + (player.direction * initialDistance)));
             player.setState(PlayerState.AUTOMATED_WALKING);
         });
@@ -293,13 +293,13 @@ onElevatorZoneClicked(targetFloor, player) {
 
     // Update target floor and set new targetX
     player.targetFloor = targetFloor;
-    player.targetX = this.elevator_X_position + 0;
+    player.targetX = this.elevator_X_position;
 
     const arrivalCheck = this.time.addEvent({
-        delay: 50,
+        delay: GameConfig.ARRIVAL_CHECK_POLL_MS,
         loop: true,
         callback: () => {
-            const dx = Math.abs(player.x - (this.elevator_X_position+0));
+            const dx = Math.abs(player.x - this.elevator_X_position);
             // Cancel if they somehow entered elevator or changed mind again
             if (
                 player.is(PlayerState.IN_ELEVATOR) ||
@@ -312,7 +312,7 @@ onElevatorZoneClicked(targetFloor, player) {
             }
             player.targetX = this.elevator_X_position;
             // Snap to elevator and request
-            if (dx < 40) {
+            if (dx < GameConfig.ELEVATOR_ARRIVAL_THRESHOLD) {
                 player.targetX = null;
                 player.vx = 0;
                 arrivalCheck.remove();
@@ -345,13 +345,13 @@ onElevatorZoneClicked(targetFloor, player) {
                     if (reached) {
                         player.setState(PlayerState.AUTOMATED_IDLE);
                         player.idleTimer = 0;
-                        player.idleDuration = 1 + Math.random() * 2;
+                        player.idleDuration = GameConfig.NPC_IDLE_MIN + Math.random() * GameConfig.NPC_IDLE_RANGE;
                     }
                 } else if (player.is(PlayerState.WALKING) && player.targetX === null) {
                     // Edge case: WALKING but targetX already null
                     player.setState(PlayerState.AUTOMATED_IDLE);
                     player.idleTimer = 0;
-                    player.idleDuration = 1 + Math.random() * 2;
+                    player.idleDuration = GameConfig.NPC_IDLE_MIN + Math.random() * GameConfig.NPC_IDLE_RANGE;
                 } else {
                     this.updateAutomatedBehavior(player, dt);
                 }
@@ -399,7 +399,7 @@ onElevatorZoneClicked(targetFloor, player) {
             if (player.idleTimer >= player.idleDuration) {
                 // End idle period and start moving
                 player.idleTimer = 0;
-                const distance = 60 + Math.random() * 120; // Random movement distance
+                const distance = GameConfig.NPC_MOVE_MIN + Math.random() * GameConfig.NPC_MOVE_RANGE;
                 let newTargetX = player.x + (player.direction * distance);
 
                 // If new target would be out of bounds, reverse direction
@@ -409,7 +409,7 @@ onElevatorZoneClicked(targetFloor, player) {
                 }
 
                 // Clamp target within boundaries
-                player.targetX = Math.max(player.minX + 10, Math.min(player.maxX - 10, newTargetX));
+                player.targetX = Math.max(player.minX + GameConfig.BOUNDARY_MARGIN, Math.min(player.maxX - GameConfig.BOUNDARY_MARGIN, newTargetX));
                 player.setState(PlayerState.AUTOMATED_WALKING);
             }
         } else if (player.is(PlayerState.AUTOMATED_WALKING) && player.targetX !== null) {
@@ -420,8 +420,8 @@ onElevatorZoneClicked(targetFloor, player) {
             player.speed = originalSpeed; // Restore original speed
 
             // Check if reached target or boundaries
-            const reachedTarget = Math.abs(player.x - player.targetX) < 5;
-            const hitBoundary = player.x <= player.minX + 5 || player.x >= player.maxX - 5;
+            const reachedTarget = Math.abs(player.x - player.targetX) < GameConfig.BOUNDARY_TOLERANCE;
+            const hitBoundary = player.x <= player.minX + GameConfig.BOUNDARY_TOLERANCE || player.x >= player.maxX - GameConfig.BOUNDARY_TOLERANCE;
 
             if (reachedTarget || hitBoundary) {
                 // Stop and start idle period
@@ -429,7 +429,7 @@ onElevatorZoneClicked(targetFloor, player) {
                 player.vx = 0;
                 player.setState(PlayerState.AUTOMATED_IDLE);
                 player.idleTimer = 0;
-                player.idleDuration = 1.5 + Math.random() * 3; // Random idle time between 1.5-4.5 seconds
+                player.idleDuration = GameConfig.NPC_LONG_IDLE_MIN + Math.random() * GameConfig.NPC_LONG_IDLE_RANGE;
 
                 // If hit boundary, reverse direction for next movement
                 if (hitBoundary) {
@@ -438,18 +438,18 @@ onElevatorZoneClicked(targetFloor, player) {
             }
 
             // Small random chance to stop and idle mid-movement
-            if (Math.random() < 0.003) {
+            if (Math.random() < GameConfig.NPC_IDLE_CHANCE_PER_FRAME) {
                 player.targetX = null;
                 player.vx = 0;
                 player.setState(PlayerState.AUTOMATED_IDLE);
                 player.idleTimer = 0;
-                player.idleDuration = 1 + Math.random() * 2;
+                player.idleDuration = GameConfig.NPC_IDLE_MIN + Math.random() * GameConfig.NPC_IDLE_RANGE;
             }
         } else {
             // Safety fallback — force into automated idle
             player.forceState(PlayerState.AUTOMATED_IDLE);
             player.idleTimer = 0;
-            player.idleDuration = 1 + Math.random() * 2;
+            player.idleDuration = GameConfig.NPC_IDLE_MIN + Math.random() * GameConfig.NPC_IDLE_RANGE;
         }
     }
 
@@ -485,7 +485,7 @@ onElevatorZoneClicked(targetFloor, player) {
             if (player.isAutomated) {
                 player.forceState(PlayerState.AUTOMATED_IDLE);
                 player.idleTimer = 0;
-                player.idleDuration = 1 + Math.random() * 2;
+                player.idleDuration = GameConfig.NPC_IDLE_MIN + Math.random() * GameConfig.NPC_IDLE_RANGE;
             } else if (!player.isAnyOf(PlayerState.WAITING_FOR_ELEVATOR, PlayerState.IN_ELEVATOR)) {
                 player.forceState(PlayerState.IDLE);
             }

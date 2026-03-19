@@ -71,6 +71,41 @@ class GameConfig {
     
     // Elevator settings
     static ELEVATOR_SPEED = 1500; // milliseconds
+    static ELEVATOR_X_POSITION = 250; // X coordinate of elevator zone
+    static ELEVATOR_ARRIVAL_THRESHOLD = 40; // Snap distance for elevator arrival (pixels)
+    static ELEVATOR_DOOR_TRANSITION_MS = 150; // Door open/close animation (ms)
+    static ELEVATOR_DOOR_OPEN_DELAY_MS = 400; // Delay before boarding after doors open (ms)
+    static ELEVATOR_BOARDING_POLL_MS = 50; // Boarding walk check interval (ms)
+    static ELEVATOR_EXIT_DELAY_MS = 200; // Exit step interval (ms)
+    static ELEVATOR_LIGHT_FLICKER_MS = 500; // Light off delay during travel (ms)
+
+    // Door settings
+    static DOOR_PROXIMITY_THRESHOLD = 20; // Door collision detection range (pixels)
+    static DOOR_OPEN_DELAY_MS = 200; // Delay before resuming movement through door (ms)
+    static DOOR_CLOSE_DELAY_MS = 1000; // Total door open duration (ms)
+
+    // NPC automation settings
+    static NPC_SPEED_FACTOR = 0.4; // Automated NPC speed as fraction of CHAR_SPEED
+    static NPC_IDLE_CHANCE_PER_FRAME = 0.003; // Random chance to stop mid-movement
+    static NPC_LOBBY_MIN_X = 200; // Lobby floor movement left boundary
+    static NPC_FLOOR_MIN_X = 280; // Upper floors movement left boundary
+    static NPC_MAX_X = 500; // Movement right boundary (all floors)
+    static NPC_INITIAL_IDLE_MIN = 2; // Initial idle duration minimum (seconds)
+    static NPC_INITIAL_IDLE_RANGE = 3; // Initial idle duration random range (seconds)
+    static NPC_IDLE_MIN = 1; // Standard idle minimum (seconds)
+    static NPC_IDLE_RANGE = 2; // Standard idle random range (seconds)
+    static NPC_LONG_IDLE_MIN = 1.5; // Extended idle minimum (seconds)
+    static NPC_LONG_IDLE_RANGE = 3; // Extended idle random range (seconds)
+    static NPC_INITIAL_MOVE_MIN = 60; // Initial movement distance minimum (pixels)
+    static NPC_INITIAL_MOVE_RANGE = 80; // Initial movement distance random range (pixels)
+    static NPC_MOVE_MIN = 60; // Automated movement distance minimum (pixels)
+    static NPC_MOVE_RANGE = 120; // Automated movement distance random range (pixels)
+
+    // Proximity thresholds
+    static MOVE_SNAP_THRESHOLD = 2; // Distance to snap to target (pixels)
+    static BOUNDARY_TOLERANCE = 5; // Wall/target boundary tolerance (pixels)
+    static BOUNDARY_MARGIN = 10; // Inset from movement boundaries (pixels)
+    static ARRIVAL_CHECK_POLL_MS = 50; // Elevator arrival check interval (ms)
 
     // Floor position calculations (centralized to avoid duplication)
     static getScaledFloorHeight() {

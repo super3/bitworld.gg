@@ -9,3 +9,5 @@ global.VALID_TRANSITIONS = VALID_TRANSITIONS;
 global.PlayerStateMachine = PlayerStateMachine;
 
 global.Player = require(path.resolve(__dirname, '..', 'js/Player.js'));
+global.DoorManager = require(path.resolve(__dirname, '..', 'js/managers/DoorManager.js'));
+global.ElevatorManager = require(path.resolve(__dirname, '..', 'js/managers/ElevatorManager.js'));

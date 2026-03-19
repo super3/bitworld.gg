@@ -38,7 +38,7 @@ class Player {
 
         // Automation properties (initialized by GameScene.initializeNPCBehaviors)
         this.direction = 1;
-        this.automatedSpeed = GameConfig.CHAR_SPEED * 0.4;
+        this.automatedSpeed = GameConfig.CHAR_SPEED * GameConfig.NPC_SPEED_FACTOR;
         this.idleTimer = 0;
         this.idleDuration = 0;
         this.minX = 0;
@@ -97,7 +97,7 @@ class Player {
             this.x += this.vx * dt;
             this.facingRight = dir > 0;
 
-            if (Math.abs(dx) < 2) {
+            if (Math.abs(dx) < GameConfig.MOVE_SNAP_THRESHOLD) {
                 this.x = this.targetX;
                 this.stop();
                 return true;

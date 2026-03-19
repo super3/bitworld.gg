@@ -39,7 +39,7 @@ DoorManager.prototype.checkDoorCollision = function (player, dx) {
 
     return this.doors.find(door =>
         door.floor === player.currentFloor &&
-        Math.abs(door.x - player.x) < 20 &&
+        Math.abs(door.x - player.x) < GameConfig.DOOR_PROXIMITY_THRESHOLD &&
         Math.sign(dx) === Math.sign(door.x - player.x) &&
         !door.isOpen // door must be closed for collision
     );
@@ -63,13 +63,13 @@ DoorManager.prototype.tryOpenDoor = function (player, dx) {
     door.closedSprite.setVisible(false);
     door.openedSprite.setVisible(true);
 
-    this.scene.time.delayedCall(200, () => {
+    this.scene.time.delayedCall(GameConfig.DOOR_OPEN_DELAY_MS, () => {
         if (player.is(PlayerState.WALKING_THROUGH_DOOR) && originalTargetX !== null) {
             player.targetX = originalTargetX;
         }
     });
 
-    this.scene.time.delayedCall(1000, () => {
+    this.scene.time.delayedCall(GameConfig.DOOR_CLOSE_DELAY_MS, () => {
         door.isOpen = false;
         door.closedSprite.setVisible(true);
         door.openedSprite.setVisible(false);
@@ -82,7 +82,7 @@ DoorManager.prototype.tryOpenDoor = function (player, dx) {
                 } else {
                     player.forceState(PlayerState.AUTOMATED_IDLE);
                     player.idleTimer = 0;
-                    player.idleDuration = 1 + Math.random() * 2;
+                    player.idleDuration = GameConfig.NPC_IDLE_MIN + Math.random() * GameConfig.NPC_IDLE_RANGE;
                 }
             } else {
                 if (player.targetX !== null) {
@@ -94,3 +94,6 @@ DoorManager.prototype.tryOpenDoor = function (player, dx) {
         }
     });
 };
+
+/* istanbul ignore next */
+if (typeof module !== 'undefined') module.exports = DoorManager;

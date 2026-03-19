@@ -94,7 +94,7 @@ class ElevatorManager {
 
                 // Only flicker light off if not at target floor yet
                 if (count < steps) {
-                    this.scene.time.delayedCall(500, () => {
+                    this.scene.time.delayedCall(GameConfig.ELEVATOR_LIGHT_FLICKER_MS, () => {
                         this.elevatorLightFlicker(0);
                     });
                 }
@@ -127,7 +127,7 @@ class ElevatorManager {
             this.updateElevatorSprite(floor, true); // Open doors
 
             // Step 1: small delay to simulate door open
-            this.scene.time.delayedCall(400, () => {
+            this.scene.time.delayedCall(GameConfig.ELEVATOR_DOOR_OPEN_DELAY_MS, () => {
                 // Step 2: show exiting players
                 const exiting = this.boardedPlayers.filter(p => p.targetFloor === floor);
                 exiting.forEach(player => {
@@ -143,7 +143,7 @@ class ElevatorManager {
                         if (player.isAutomated) {
                             player.forceState(PlayerState.AUTOMATED_IDLE);
                             player.idleTimer = 0;
-                            player.idleDuration = 1 + Math.random() * 2;
+                            player.idleDuration = GameConfig.NPC_IDLE_MIN + Math.random() * GameConfig.NPC_IDLE_RANGE;
                         } else {
                             player.forceState(PlayerState.IDLE);
                         }
@@ -160,7 +160,7 @@ class ElevatorManager {
                     .map(({ player }) => player);
 
                 this.sequentialBoarding([...newBoarders], () => {
-                    this.scene.time.delayedCall(500, () => {
+                    this.scene.time.delayedCall(GameConfig.ELEVATOR_LIGHT_FLICKER_MS, () => {
                         this.elevatorLightFlicker(0);
                      this.updateElevatorSprite(floor, false); // Close doors
                             this.scene.time.delayedCall(GameConfig.ELEVATOR_SPEED, () => {
@@ -188,11 +188,11 @@ class ElevatorManager {
         const targetX = this.scene.elevator_X_position;
         player.targetX = targetX;
         const walkInterval = this.scene.time.addEvent({
-            delay: 50,
+            delay: GameConfig.ELEVATOR_BOARDING_POLL_MS,
             loop: true,
             callback: () => {
                 const dx = targetX - player.x;
-                if (Math.abs(dx) < 2) {
+                if (Math.abs(dx) < GameConfig.MOVE_SNAP_THRESHOLD) {
                     player.x = targetX;
                     player.vx = 0;
                     player.spriteRef.setDepth(0); // Behind the elevator door
@@ -217,7 +217,7 @@ class ElevatorManager {
     const player = players.shift();
 
     const walkInterval = this.scene.time.addEvent({
-        delay: 200,
+        delay: GameConfig.ELEVATOR_EXIT_DELAY_MS,
         loop: true,
         callback: () => {
             player.y = GameConfig.getPlayerFloorY(floor);
@@ -285,7 +285,7 @@ continueElevatorTravel(originalTarget, direction) {
 
         // Only flicker light off if not at target floor yet
         if (this.elevatorCurrentFloor !== originalTarget) {
-            this.scene.time.delayedCall(500, () => {
+            this.scene.time.delayedCall(GameConfig.ELEVATOR_LIGHT_FLICKER_MS, () => {
                 this.elevatorLightFlicker(0);
             });
         }
@@ -311,11 +311,11 @@ continueElevatorTravel(originalTarget, direction) {
         if (hasActivity) {
             this.updateElevatorSprite(floor, true); // Open doors
 
-            this.scene.time.delayedCall(100, () => {
+            this.scene.time.delayedCall(GameConfig.ELEVATOR_EXIT_DELAY_MS / 2, () => {
                 this.sequentialExiting([...exiting], floor, () => {
-                    this.scene.time.delayedCall(300, () => {
+                    this.scene.time.delayedCall(GameConfig.ELEVATOR_EXIT_DELAY_MS * 1.5, () => {
                         this.sequentialBoarding([...newBoarders], () => {
-                            this.scene.time.delayedCall(400, () => {
+                            this.scene.time.delayedCall(GameConfig.ELEVATOR_DOOR_OPEN_DELAY_MS, () => {
                                 this.updateElevatorSprite(floor, false); // Close doors
                                 stepsRemaining--;
                                 this.scene.time.delayedCall(GameConfig.ELEVATOR_SPEED/2, step); // Call next step after short pause
@@ -346,7 +346,7 @@ updateElevatorSprite(floorIndex, isOpen) {
     sprite.setTexture('Elevator_slightlyOpened');
     this.currentDoorState[floorIndex] = 'slightly';
 
-    this.scene.time.delayedCall(150, () => {
+    this.scene.time.delayedCall(GameConfig.ELEVATOR_DOOR_TRANSITION_MS, () => {
         // Step 2: finish to fully opened or closed
         const finalKey = isOpen ? 'Elevator_opened' : 'Elevator_closed';
         sprite.setTexture(finalKey);
@@ -359,8 +359,11 @@ elevatorLightFlicker(alpha)
     this.scene.tweens.add({
     targets: this.elevatorLight,
     alpha: alpha,
-    duration: 300,
+    duration: GameConfig.ELEVATOR_DOOR_TRANSITION_MS * 2,
     ease: 'Power2'
     });
 }
 }
+
+/* istanbul ignore next */
+if (typeof module !== 'undefined') module.exports = ElevatorManager;
