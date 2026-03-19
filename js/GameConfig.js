@@ -94,4 +94,7 @@ class GameConfig {
         return GameConfig.getPlayerFloorY(floorIndex) -
                GameConfig.GROUND_HEIGHT - GameConfig.SPRITE_HEIGHT + 28;
     }
-} 
+}
+
+/* istanbul ignore next */
+if (typeof module !== 'undefined') module.exports = GameConfig; 

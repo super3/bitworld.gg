@@ -135,3 +135,6 @@ class Player {
         this.toilet = Math.max(0, this.toilet - (TOILET_RATE * dt));
     }
 }
+
+/* istanbul ignore next */
+if (typeof module !== 'undefined') module.exports = Player;

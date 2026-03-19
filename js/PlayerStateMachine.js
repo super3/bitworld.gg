@@ -142,3 +142,6 @@ class PlayerStateMachine {
         return states.includes(this._state);
     }
 }
+
+/* istanbul ignore next */
+if (typeof module !== 'undefined') module.exports = { PlayerState, VALID_TRANSITIONS, PlayerStateMachine };

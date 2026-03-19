@@ -1,33 +1,11 @@
-const fs = require('fs');
 const path = require('path');
 
-function loadScript(filePath) {
-    const code = fs.readFileSync(path.resolve(__dirname, '..', filePath), 'utf-8');
-    return eval(code + '\n;typeof ' + getClassName(filePath) + ' !== "undefined" ? ' + getClassName(filePath) + ' : undefined;');
-}
+// Load source files via require() so Jest can instrument them for coverage
+global.GameConfig = require(path.resolve(__dirname, '..', 'js/GameConfig.js'));
 
-function getClassName(filePath) {
-    return path.basename(filePath, '.js');
-}
+const { PlayerState, VALID_TRANSITIONS, PlayerStateMachine } = require(path.resolve(__dirname, '..', 'js/PlayerStateMachine.js'));
+global.PlayerState = PlayerState;
+global.VALID_TRANSITIONS = VALID_TRANSITIONS;
+global.PlayerStateMachine = PlayerStateMachine;
 
-function loadMultipleExports(filePath, names) {
-    const code = fs.readFileSync(path.resolve(__dirname, '..', filePath), 'utf-8');
-    const result = {};
-    // Build a return expression that captures all named exports
-    const returnExpr = names.map(n => `"${n}": typeof ${n} !== "undefined" ? ${n} : undefined`).join(',');
-    const wrapped = code + '\n;({' + returnExpr + '})';
-    const exports = eval(wrapped);
-    names.forEach(n => {
-        if (exports[n] !== undefined) {
-            global[n] = exports[n];
-        }
-    });
-}
-
-// Load source files into the global scope (order matters)
-global.GameConfig = loadScript('js/GameConfig.js');
-
-// PlayerStateMachine.js defines PlayerState, VALID_TRANSITIONS, and PlayerStateMachine
-loadMultipleExports('js/PlayerStateMachine.js', ['PlayerState', 'VALID_TRANSITIONS', 'PlayerStateMachine']);
-
-global.Player = loadScript('js/Player.js');
+global.Player = require(path.resolve(__dirname, '..', 'js/Player.js'));

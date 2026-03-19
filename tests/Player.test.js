@@ -1,3 +1,52 @@
+describe('GameConfig', () => {
+    describe('static helper methods', () => {
+        it('should calculate scaled floor height', () => {
+            const expected = GameConfig.BUILDING_HEIGHT * GameConfig.BUILDING_SCALE;
+            expect(GameConfig.getScaledFloorHeight()).toBe(expected);
+        });
+
+        it('should calculate building floor Y position', () => {
+            const sh = GameConfig.getScaledFloorHeight();
+            const y = GameConfig.getBuildingFloorY(0);
+            const expected = GameConfig.WINDOW_HEIGHT - GameConfig.GROUND_HEIGHT - sh * 1 + sh / 2;
+            expect(y).toBe(expected);
+        });
+
+        it('should calculate different Y for higher floors', () => {
+            const y0 = GameConfig.getBuildingFloorY(0);
+            const y1 = GameConfig.getBuildingFloorY(1);
+            expect(y1).toBeLessThan(y0); // Higher floors have lower Y
+        });
+
+        it('should calculate player floor Y position', () => {
+            const y = GameConfig.getPlayerFloorY(0);
+            const sh = GameConfig.getScaledFloorHeight();
+            const expected = GameConfig.WINDOW_HEIGHT - GameConfig.GROUND_HEIGHT -
+                (GameConfig.SPRITE_HEIGHT + 3) - sh * 0 + sh / 2;
+            expect(y).toBe(expected);
+        });
+
+        it('should calculate player Y for higher floors', () => {
+            const y0 = GameConfig.getPlayerFloorY(0);
+            const y2 = GameConfig.getPlayerFloorY(2);
+            expect(y2).toBeLessThan(y0);
+        });
+
+        it('should calculate elevator Y position', () => {
+            const y = GameConfig.getElevatorY(0);
+            const expected = GameConfig.getPlayerFloorY(0) -
+                GameConfig.GROUND_HEIGHT - GameConfig.SPRITE_HEIGHT + 28;
+            expect(y).toBe(expected);
+        });
+
+        it('should calculate elevator Y for higher floors', () => {
+            const y0 = GameConfig.getElevatorY(0);
+            const y1 = GameConfig.getElevatorY(1);
+            expect(y1).toBeLessThan(y0);
+        });
+    });
+});
+
 describe('Player', () => {
     let player;
 
@@ -222,6 +271,16 @@ describe('PlayerStateMachine', () => {
     describe('constructor', () => {
         it('should start in the given initial state', () => {
             expect(sm.state).toBe(PlayerState.IDLE);
+        });
+
+        it('should default to IDLE when no argument provided', () => {
+            const defaultSm = new PlayerStateMachine();
+            expect(defaultSm.state).toBe(PlayerState.IDLE);
+        });
+
+        it('should accept a custom initial state', () => {
+            const customSm = new PlayerStateMachine(PlayerState.WALKING);
+            expect(customSm.state).toBe(PlayerState.WALKING);
         });
 
         it('should have null previousState initially', () => {
