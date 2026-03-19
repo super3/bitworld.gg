@@ -35,17 +35,22 @@ describe('Player', () => {
         });
 
         it('should initialize movement state as idle', () => {
-            expect(player.isWalking).toBe(false);
             expect(player.vx).toBe(0);
             expect(player.targetX).toBeNull();
             expect(player.facingRight).toBe(true);
         });
 
         it('should initialize elevator state as inactive', () => {
-            expect(player.waitingForElevator).toBe(false);
-            expect(player.inElevator).toBe(false);
             expect(player.targetFloor).toBeNull();
-            expect(player.walkingThroughDoor).toBe(false);
+            expect(player.deferredTargetX).toBeNull();
+        });
+
+        it('should initialize state machine in IDLE state', () => {
+            expect(player.state).toBe(PlayerState.IDLE);
+        });
+
+        it('should initialize isAutomated to false', () => {
+            expect(player.isAutomated).toBe(false);
         });
     });
 
@@ -57,7 +62,6 @@ describe('Player', () => {
             expect(player.vx).toBeGreaterThan(0);
             expect(player.x).toBeGreaterThan(400);
             expect(player.facingRight).toBe(true);
-            expect(player.isWalking).toBe(true);
         });
 
         it('should move left toward a target to the left', () => {
@@ -67,26 +71,33 @@ describe('Player', () => {
             expect(player.vx).toBeLessThan(0);
             expect(player.x).toBeLessThan(400);
             expect(player.facingRight).toBe(false);
-            expect(player.isWalking).toBe(true);
         });
 
-        it('should stop when within 2px of target', () => {
+        it('should return true and stop when within 2px of target', () => {
             player.targetX = 401; // 1px away
-            player.moveTowardTarget(0.001);
+            const reached = player.moveTowardTarget(0.001);
 
+            expect(reached).toBe(true);
             expect(player.x).toBe(401);
             expect(player.vx).toBe(0);
             expect(player.targetX).toBeNull();
-            expect(player.isWalking).toBe(false);
         });
 
-        it('should not move when targetX is null', () => {
+        it('should return false when targetX is null', () => {
             player.targetX = null;
-            player.moveTowardTarget(0.1);
+            const reached = player.moveTowardTarget(0.1);
 
+            expect(reached).toBe(false);
             expect(player.x).toBe(400);
             expect(player.vx).toBe(0);
-            expect(player.isWalking).toBe(false);
+        });
+
+        it('should return false when still moving', () => {
+            player.targetX = 600;
+            const reached = player.moveTowardTarget(0.5);
+
+            expect(reached).toBe(false);
+            expect(player.x).toBeCloseTo(450, 0);
         });
 
         it('should update position based on speed and delta time', () => {
@@ -100,16 +111,22 @@ describe('Player', () => {
     });
 
     describe('stop', () => {
-        it('should reset velocity, target, and walking state', () => {
+        it('should reset velocity and target', () => {
             player.vx = 100;
             player.targetX = 500;
-            player.isWalking = true;
 
             player.stop();
 
             expect(player.vx).toBe(0);
             expect(player.targetX).toBeNull();
-            expect(player.isWalking).toBe(false);
+        });
+
+        it('should not change state machine state', () => {
+            player.setState(PlayerState.WALKING);
+            player.stop();
+
+            // stop() is physics-only, does not manage state
+            expect(player.state).toBe(PlayerState.WALKING);
         });
     });
 
@@ -164,6 +181,154 @@ describe('Player', () => {
             expect(player.hunger).toBe(0);
             expect(player.sleep).toBe(0);
             expect(player.toilet).toBe(0);
+        });
+    });
+
+    describe('state machine integration', () => {
+        it('should expose state convenience methods', () => {
+            expect(player.state).toBe(PlayerState.IDLE);
+            expect(player.is(PlayerState.IDLE)).toBe(true);
+            expect(player.isAnyOf(PlayerState.IDLE, PlayerState.WALKING)).toBe(true);
+            expect(player.isAnyOf(PlayerState.WALKING, PlayerState.IN_ELEVATOR)).toBe(false);
+        });
+
+        it('should allow valid transitions via setState', () => {
+            const result = player.setState(PlayerState.WALKING);
+            expect(result).toBe(true);
+            expect(player.state).toBe(PlayerState.WALKING);
+        });
+
+        it('should reject invalid transitions via setState', () => {
+            // IDLE → IN_ELEVATOR is not a valid transition
+            const result = player.setState(PlayerState.IN_ELEVATOR);
+            expect(result).toBe(false);
+            expect(player.state).toBe(PlayerState.IDLE);
+        });
+
+        it('should allow forceState to bypass validation', () => {
+            player.forceState(PlayerState.IN_ELEVATOR);
+            expect(player.state).toBe(PlayerState.IN_ELEVATOR);
+        });
+    });
+});
+
+describe('PlayerStateMachine', () => {
+    let sm;
+
+    beforeEach(() => {
+        sm = new PlayerStateMachine(PlayerState.IDLE);
+    });
+
+    describe('constructor', () => {
+        it('should start in the given initial state', () => {
+            expect(sm.state).toBe(PlayerState.IDLE);
+        });
+
+        it('should have null previousState initially', () => {
+            expect(sm.previousState).toBeNull();
+        });
+    });
+
+    describe('setState', () => {
+        it('should transition between valid states', () => {
+            expect(sm.setState(PlayerState.WALKING)).toBe(true);
+            expect(sm.state).toBe(PlayerState.WALKING);
+        });
+
+        it('should track previous state', () => {
+            sm.setState(PlayerState.WALKING);
+            expect(sm.previousState).toBe(PlayerState.IDLE);
+        });
+
+        it('should reject invalid transitions', () => {
+            const warn = jest.spyOn(console, 'warn').mockImplementation();
+            expect(sm.setState(PlayerState.IN_ELEVATOR)).toBe(false);
+            expect(sm.state).toBe(PlayerState.IDLE);
+            warn.mockRestore();
+        });
+
+        it('should return true for same-state transitions (no-op)', () => {
+            expect(sm.setState(PlayerState.IDLE)).toBe(true);
+            expect(sm.state).toBe(PlayerState.IDLE);
+        });
+    });
+
+    describe('forceState', () => {
+        it('should bypass validation', () => {
+            sm.forceState(PlayerState.IN_ELEVATOR);
+            expect(sm.state).toBe(PlayerState.IN_ELEVATOR);
+            expect(sm.previousState).toBe(PlayerState.IDLE);
+        });
+    });
+
+    describe('is / isAnyOf', () => {
+        it('should check current state', () => {
+            expect(sm.is(PlayerState.IDLE)).toBe(true);
+            expect(sm.is(PlayerState.WALKING)).toBe(false);
+        });
+
+        it('should check against multiple states', () => {
+            expect(sm.isAnyOf(PlayerState.IDLE, PlayerState.WALKING)).toBe(true);
+            expect(sm.isAnyOf(PlayerState.WALKING, PlayerState.IN_ELEVATOR)).toBe(false);
+        });
+    });
+
+    describe('full transition chains', () => {
+        it('should support IDLE → WALKING → IDLE', () => {
+            expect(sm.setState(PlayerState.WALKING)).toBe(true);
+            expect(sm.setState(PlayerState.IDLE)).toBe(true);
+            expect(sm.state).toBe(PlayerState.IDLE);
+        });
+
+        it('should support automated cycle: IDLE → AUTO_IDLE → AUTO_WALKING → AUTO_IDLE', () => {
+            sm.setState(PlayerState.AUTOMATED_IDLE);
+            expect(sm.state).toBe(PlayerState.AUTOMATED_IDLE);
+
+            sm.setState(PlayerState.AUTOMATED_WALKING);
+            expect(sm.state).toBe(PlayerState.AUTOMATED_WALKING);
+
+            sm.setState(PlayerState.AUTOMATED_IDLE);
+            expect(sm.state).toBe(PlayerState.AUTOMATED_IDLE);
+        });
+
+        it('should support elevator flow: IDLE → WALKING → WALK_TO_ELEV → WAITING → IN_ELEV → IDLE', () => {
+            sm.setState(PlayerState.WALKING);
+            sm.setState(PlayerState.WALKING_TO_ELEVATOR);
+            sm.setState(PlayerState.WAITING_FOR_ELEVATOR);
+            sm.setState(PlayerState.IN_ELEVATOR);
+            sm.setState(PlayerState.IDLE);
+            expect(sm.state).toBe(PlayerState.IDLE);
+        });
+
+        it('should support door flow: WALKING → DOOR → WALKING', () => {
+            sm.setState(PlayerState.WALKING);
+            sm.setState(PlayerState.WALKING_THROUGH_DOOR);
+            sm.setState(PlayerState.WALKING);
+            expect(sm.state).toBe(PlayerState.WALKING);
+        });
+
+        it('should support automated door flow: AUTO_WALKING → DOOR → AUTO_WALKING', () => {
+            sm.setState(PlayerState.AUTOMATED_IDLE);
+            sm.setState(PlayerState.AUTOMATED_WALKING);
+            sm.setState(PlayerState.WALKING_THROUGH_DOOR);
+            sm.setState(PlayerState.AUTOMATED_WALKING);
+            expect(sm.state).toBe(PlayerState.AUTOMATED_WALKING);
+        });
+
+        it('should support door-to-elevator flow: DOOR → WAITING_FOR_ELEVATOR', () => {
+            // Player walks through door on the way to elevator, reaches elevator
+            // zone while door cooldown (1000ms) is still active
+            sm.setState(PlayerState.WALKING);
+            sm.setState(PlayerState.WALKING_THROUGH_DOOR);
+            expect(sm.setState(PlayerState.WAITING_FOR_ELEVATOR)).toBe(true);
+            expect(sm.state).toBe(PlayerState.WAITING_FOR_ELEVATOR);
+        });
+
+        it('should support door-to-elevator-click flow: DOOR → WALKING_TO_ELEVATOR', () => {
+            sm.setState(PlayerState.WALKING);
+            sm.setState(PlayerState.WALKING_THROUGH_DOOR);
+            expect(sm.setState(PlayerState.WALKING_TO_ELEVATOR)).toBe(true);
+            expect(sm.state).toBe(PlayerState.WALKING_TO_ELEVATOR);
         });
     });
 });

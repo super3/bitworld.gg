@@ -10,16 +10,23 @@ class InputManager {
             if (pointer.rightButtonDown()) return; // handled elsewhere for selection
 
             const selected = this.scene.selectedPlayer;
-            
+
             if (this.scene.elevatorManager.boardedPlayers.includes(selected)) return;
-            
+
             if (selected) {
-                if(selected.elevatorClickTimer)
+                if (selected.elevatorClickTimer)
                        selected.elevatorClickTimer.remove();
 
-                selected.waitingForElevator = false;
+                // Cancel waiting/door states on new click
+                if (selected.isAnyOf(PlayerState.WAITING_FOR_ELEVATOR, PlayerState.WALKING_THROUGH_DOOR, PlayerState.WALKING_TO_ELEVATOR)) {
+                    selected.forceState(PlayerState.IDLE);
+                }
+
                 selected.targetX = pointer.worldX;
-                selected.walkingThroughDoor = false;
+                if (selected.is(PlayerState.IDLE)) {
+                    selected.setState(PlayerState.WALKING);
+                }
+                // If already WALKING, state stays — just new targetX
             }
         });
     }

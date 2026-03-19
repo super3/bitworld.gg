@@ -25,7 +25,7 @@ class ElevatorManager {
             const backdropRT = this.scene.add.renderTexture(elevatorX, elevatorY + 5, 32, 32);
             backdropRT.setOrigin(0.5, 1);
             backdropRT.setDepth(0);
-            backdropRT.setScale(2); 
+            backdropRT.setScale(2);
 
             // Top-left of red background is tile index 512
             const indices = [1225, 1226, 1260, 1261];
@@ -50,11 +50,11 @@ class ElevatorManager {
     }
 
     requestElevator(player, targetFloor) {
-        player.waitingForElevator = true;
+        // Player should already be in WAITING_FOR_ELEVATOR state
         player.targetFloor = targetFloor;
 
         if (!this.activeRequest) {
-        
+
             this.activeRequest = { player, targetFloor };
             this.processQueue();
         }
@@ -62,7 +62,7 @@ class ElevatorManager {
 
     processQueue() {
         if (this.isLocked || !this.activeRequest) return;
-        
+
         const { player } = this.activeRequest;
         const startFloor = this.elevatorCurrentFloor;
         const endFloor = player.currentFloor;
@@ -72,7 +72,7 @@ class ElevatorManager {
             this.beginBoarding();
         } else {
             this.moveToFloor(endFloor, () => {
-            
+
                 this.beginBoarding();
             });
         }
@@ -91,18 +91,18 @@ class ElevatorManager {
             callback: () => {
                 this.elevatorCurrentFloor += direction;
                 count++;
-                
+
                 // Only flicker light off if not at target floor yet
                 if (count < steps) {
                     this.scene.time.delayedCall(500, () => {
                         this.elevatorLightFlicker(0);
                     });
                 }
-                
+
                 // Move elevator light to match new floor
                 this.elevatorLight.y = GameConfig.getElevatorY(this.elevatorCurrentFloor);
                 this.elevatorLightFlicker(1);
-                
+
                 if (count === steps) {
                     timer.remove();
                     onArriveCallback();
@@ -118,7 +118,7 @@ class ElevatorManager {
 
         const hasBoarders = this.scene.players.some(({ player }) =>
             player.currentFloor === floor &&
-            player.waitingForElevator &&
+            player.is(PlayerState.WAITING_FOR_ELEVATOR) &&
             Math.sign(player.targetFloor - player.currentFloor) === direction
         );
 
@@ -134,20 +134,27 @@ class ElevatorManager {
                     player.currentFloor = floor;
                     player.y = GameConfig.getPlayerFloorY(floor);
                     player.targetFloor = null;
-                    player.waitingForElevator = false;
                     player.spriteRef.setVisible(true);
                     if (player.deferredTargetX !== undefined) {
                         player.targetX = player.deferredTargetX;
                         delete player.deferredTargetX;
+                        player.forceState(PlayerState.WALKING);
+                    } else {
+                        if (player.isAutomated) {
+                            player.forceState(PlayerState.AUTOMATED_IDLE);
+                            player.idleTimer = 0;
+                            player.idleDuration = 1 + Math.random() * 2;
+                        } else {
+                            player.forceState(PlayerState.IDLE);
+                        }
                     }
-                    player.inElevator = false;
                 });
                 this.boardedPlayers = this.boardedPlayers.filter(p => p.targetFloor !== floor);
 
                 const newBoarders = this.scene.players
                     .filter(({ player }) =>
                         player.currentFloor === floor &&
-                        player.waitingForElevator &&
+                        player.is(PlayerState.WAITING_FOR_ELEVATOR) &&
                         Math.sign(player.targetFloor - player.currentFloor) === direction
                     )
                     .map(({ player }) => player);
@@ -189,8 +196,7 @@ class ElevatorManager {
                     player.x = targetX;
                     player.vx = 0;
                     player.spriteRef.setDepth(0); // Behind the elevator door
-                    player.inElevator = true;
-                    player.waitingForElevator = false;
+                    player.setState(PlayerState.IN_ELEVATOR);
                     this.boardedPlayers.push(player);
                     walkInterval.remove();
 
@@ -217,25 +223,32 @@ class ElevatorManager {
             player.y = GameConfig.getPlayerFloorY(floor);
             player.currentFloor = floor;
             player.targetFloor = null;
-            player.waitingForElevator = false;
-            player.inElevator = false;
             player.spriteRef.setDepth(20); // Return to default front layer
             if (player.deferredTargetX !== undefined) {
                 player.targetX = player.deferredTargetX;
                 delete player.deferredTargetX;
+                player.forceState(PlayerState.WALKING);
+            } else {
+                if (player.isAutomated) {
+                    player.forceState(PlayerState.AUTOMATED_IDLE);
+                    player.idleTimer = 0;
+                    player.idleDuration = 1 + Math.random() * 2;
+                } else {
+                    player.forceState(PlayerState.IDLE);
+                }
             }
             walkInterval.remove();
             this.sequentialExiting(players, floor, onComplete);
-   
+
         }
     });
 }
 
 continueElevatorTravel(originalTarget, direction) {
     let stepsRemaining = Math.abs(originalTarget - this.elevatorCurrentFloor);
-    
+
     const step = () => {
-        
+
         if (stepsRemaining <= 0) {
             this.isLocked = false;
             this.activeRequest = null;
@@ -250,7 +263,7 @@ continueElevatorTravel(originalTarget, direction) {
                 };
                 this.processQueue();
             } else {
-                const next = this.scene.players.find(({ player }) => player.waitingForElevator);
+                const next = this.scene.players.find(({ player }) => player.is(PlayerState.WAITING_FOR_ELEVATOR));
                 if (next) {
                     this.activeRequest = {
                         player: next.player,
@@ -288,7 +301,7 @@ continueElevatorTravel(originalTarget, direction) {
         const newBoarders = this.scene.players
             .filter(({ player }) =>
                 player.currentFloor === floor &&
-                player.waitingForElevator &&
+                player.is(PlayerState.WAITING_FOR_ELEVATOR) &&
                 Math.sign(player.targetFloor - player.currentFloor) === direction
             )
             .map(({ player }) => player);
