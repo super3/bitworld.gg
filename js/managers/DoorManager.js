@@ -34,7 +34,8 @@ DoorManager.prototype.addDoor = function (floor, x, width = 32, height = 60, doo
 };
 
 DoorManager.prototype.checkDoorCollision = function (player, dx) {
-    if (player.hasEnteredDoor || player.walkingThroughDoor) return null;
+    // State machine check replaces: player.hasEnteredDoor || player.walkingThroughDoor
+    if (player.is(PlayerState.WALKING_THROUGH_DOOR)) return null;
 
     return this.doors.find(door =>
         door.floor === player.currentFloor &&
@@ -50,13 +51,12 @@ DoorManager.prototype.tryOpenDoor = function (player, dx) {
 
     // Pause movement
     const originalTargetX = player.targetX;
+    const wasAutomatedWalking = player.is(PlayerState.AUTOMATED_WALKING);
     player.targetX = null;
-
     player.vx = 0;
-    const directionAtStart = Math.sign(dx);
 
-    player.hasEnteredDoor = true;
-    player.walkingThroughDoor = true;
+    // Transition to door state
+    player.forceState(PlayerState.WALKING_THROUGH_DOOR);
     door.isOpen = true;
 
     // Visual switch: hide closed, show opened
@@ -64,12 +64,8 @@ DoorManager.prototype.tryOpenDoor = function (player, dx) {
     door.openedSprite.setVisible(true);
 
     this.scene.time.delayedCall(200, () => {
-        if (originalTargetX !== null && player.walkingThroughDoor) {
+        if (player.is(PlayerState.WALKING_THROUGH_DOOR) && originalTargetX !== null) {
             player.targetX = originalTargetX;
-            // Make sure playerCommandedMovement flag is preserved
-            if (player.playerCommandedMovement === undefined) {
-                player.playerCommandedMovement = !player.isAutomated;
-            }
         }
     });
 
@@ -77,7 +73,24 @@ DoorManager.prototype.tryOpenDoor = function (player, dx) {
         door.isOpen = false;
         door.closedSprite.setVisible(true);
         door.openedSprite.setVisible(false);
-        player.hasEnteredDoor = false;
-        player.walkingThroughDoor = false;
+
+        // Transition out of door state if still in it
+        if (player.is(PlayerState.WALKING_THROUGH_DOOR)) {
+            if (player.isAutomated) {
+                if (player.targetX !== null) {
+                    player.forceState(PlayerState.AUTOMATED_WALKING);
+                } else {
+                    player.forceState(PlayerState.AUTOMATED_IDLE);
+                    player.idleTimer = 0;
+                    player.idleDuration = 1 + Math.random() * 2;
+                }
+            } else {
+                if (player.targetX !== null) {
+                    player.forceState(PlayerState.WALKING);
+                } else {
+                    player.forceState(PlayerState.IDLE);
+                }
+            }
+        }
     });
 };

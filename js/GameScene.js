@@ -56,9 +56,9 @@ class GameScene extends Phaser.Scene {
         this.selectionPointer = this.add.image(0, 0, 'UI_Pointer_white');
         this.selectionPointer.setOrigin(0.5, 1);
         this.selectionPointer.setScale(2);
-        this.selectionPointer.setVisible(false); 
-        this.selectionPointer.setDepth(30); 
-     
+        this.selectionPointer.setVisible(false);
+        this.selectionPointer.setDepth(30);
+
         // Initialize automated NPC behaviors
         this.initializeNPCBehaviors();
 
@@ -76,58 +76,61 @@ class GameScene extends Phaser.Scene {
                 // Re-enable automation for previously selected player
                 if (this.selectedPlayer && this.selectedPlayer !== (clicked ? clicked.player : null)) {
                     this.selectedPlayer.isAutomated = true;
-                    // Don't interrupt any movement - let them complete their destination
+                    // If they were walking (player-commanded), keep that state
+                    // so they finish their destination before resuming automation.
+                    // Otherwise transition to automated idle.
+                    if (!this.selectedPlayer.is(PlayerState.WALKING)) {
+                        this.selectedPlayer.forceState(PlayerState.AUTOMATED_IDLE);
+                        this.selectedPlayer.idleTimer = 0;
+                        this.selectedPlayer.idleDuration = 1 + Math.random() * 2;
+                    }
                 }
-                
+
                 this.selectedPlayer = clicked ? clicked.player : null;
-                
+
                 // Disable automation for newly selected player
                 if (this.selectedPlayer) {
                     this.selectedPlayer.isAutomated = false;
-                    // Stop any automated movement when selected (but keep player-commanded movement)
-                    if (!this.selectedPlayer.playerCommandedMovement) {
+                    // Stop any automated movement when selected
+                    if (this.selectedPlayer.isAnyOf(PlayerState.AUTOMATED_IDLE, PlayerState.AUTOMATED_WALKING)) {
                         this.selectedPlayer.targetX = null;
                         this.selectedPlayer.vx = 0;
-                        this.selectedPlayer.isWalking = false;
-                        this.selectedPlayer.isIdling = false;
+                        this.selectedPlayer.forceState(PlayerState.IDLE);
                     }
-                    // Note: Keep playerCommandedMovement flag intact so they continue to destination
                 }
-                
+
                 this.sidebar.updatePlayer(this.selectedPlayer);
-                console.log(this.selectedPlayer);
                 return;
             }
 
             const selected = this.selectedPlayer;
             if (!selected) return;
 
-
-
             if (this.elevatorManager.boardedPlayers.includes(selected)) return;
+            if (selected.is(PlayerState.IN_ELEVATOR)) return;
 
-            if(selected.inElevator) return;
- 
-            if (selected) {
-                if(selected.elevatorClickTimer)
-                       selected.elevatorClickTimer.remove();
-
-                selected.waitingForElevator = false;
-                selected.walkingThroughDoor = false;
+            // Cancel any pending elevator or door state
+            if (selected.elevatorClickTimer) {
+                selected.elevatorClickTimer.remove();
+                selected.elevatorClickTimer = null;
             }
-
+            if (selected.isAnyOf(PlayerState.WAITING_FOR_ELEVATOR, PlayerState.WALKING_THROUGH_DOOR, PlayerState.WALKING_TO_ELEVATOR)) {
+                selected.forceState(PlayerState.IDLE);
+            }
 
             const clickedFloor = this.getClickedFloorIndex(pointer.worldY);
             if (clickedFloor === -1) return;
 
             if (clickedFloor !== selected.currentFloor) {
                 selected.deferredTargetX = pointer.worldX;
-                selected.playerCommandedMovement = true;
+                selected.setState(PlayerState.WALKING_TO_ELEVATOR);
                 this.onElevatorZoneClicked(clickedFloor, selected);
-  
             } else {
                 selected.targetX = pointer.worldX;
-                selected.playerCommandedMovement = true;
+                if (selected.is(PlayerState.IDLE)) {
+                    selected.setState(PlayerState.WALKING);
+                }
+                // If already WALKING, state stays the same — just new targetX
             }
         });
 
@@ -146,17 +149,21 @@ class GameScene extends Phaser.Scene {
                 player.minX = 280;
                 player.maxX = 500;
             }
-            
+
             // Initialize automated movement properties
             player.direction = Math.random() > 0.5 ? 1 : -1;
             player.isAutomated = true;
             player.automatedSpeed = GameConfig.CHAR_SPEED * 0.4; // Slower speed for automated NPCs (40% of normal)
             player.idleTimer = 0;
             player.idleDuration = 2 + Math.random() * 3; // Random idle time between 2-5 seconds
-            player.isIdling = false;
+
+            // Start in automated idle, then first movement will begin
+            player.forceState(PlayerState.AUTOMATED_IDLE);
+
             // Start with a random initial movement
             const initialDistance = 60 + Math.random() * 80;
             player.targetX = Math.max(player.minX, Math.min(player.maxX, player.x + (player.direction * initialDistance)));
+            player.setState(PlayerState.AUTOMATED_WALKING);
         });
     }
 
@@ -181,7 +188,7 @@ class GameScene extends Phaser.Scene {
         this.doorManager.addDoor( 3, 436,10, GameConfig.SPRITE_HEIGHT+15,"Door");
         this.doorManager.addDoor( 3, 308,10, GameConfig.SPRITE_HEIGHT+15,"Door");
 
-        
+
     }
 
 createFloorWalls() {
@@ -237,13 +244,13 @@ createFloorWalls() {
         const y = this.getFloorY(cfg.floor);
         const player = new Player(cfg.name[0], cfg.name[1], GameConfig.WINDOW_WIDTH / 2, y, cfg.sprite, cfg.floor);
         const playerSprite = new PlayerSprite(this, player);
-        
+
         // Only create animations once per unique sprite key
         if (!createdAnimations.has(cfg.sprite)) {
             AnimationManager.createAnimations(this, cfg.sprite);
             createdAnimations.add(cfg.sprite);
         }
-        
+
         this.players.push({ player, sprite: playerSprite });
     });
 
@@ -256,7 +263,7 @@ createFloorWalls() {
     }
 
     setupInput() {
-        this.inputManager = new InputManager(this); 
+        this.inputManager = new InputManager(this);
     }
 
     getFloorY(floorIndex) {
@@ -265,7 +272,7 @@ createFloorWalls() {
 
 onElevatorZoneClicked(targetFloor, player) {
     if (!player) return;
-    
+
     // Cancel previous pending movement
     if (player.elevatorClickTimer) {
         player.elevatorClickTimer.remove();
@@ -276,11 +283,12 @@ onElevatorZoneClicked(targetFloor, player) {
     if (player.currentFloor === targetFloor) {
         player.targetX = null;
         player.vx = 0;
+        player.forceState(PlayerState.IDLE);
         return;
     }
 
-    // Case: Already requesting elevator (still allow override if it's a different floor)
-    if (player.inElevator === true) return;
+    // Case: Already in elevator or already has an active request
+    if (player.is(PlayerState.IN_ELEVATOR)) return;
     if (this.elevatorManager.activeRequest && this.elevatorManager.activeRequest.player === player) return;
 
     // Update target floor and set new targetX
@@ -294,7 +302,7 @@ onElevatorZoneClicked(targetFloor, player) {
             const dx = Math.abs(player.x - (this.elevator_X_position+0));
             // Cancel if they somehow entered elevator or changed mind again
             if (
-                player.inElevator === true ||
+                player.is(PlayerState.IN_ELEVATOR) ||
                 player.currentFloor === targetFloor || // Clicked current floor again mid-way
                 (this.elevatorManager.activeRequest && this.elevatorManager.activeRequest.player === player)
             ) {
@@ -309,6 +317,7 @@ onElevatorZoneClicked(targetFloor, player) {
                 player.vx = 0;
                 arrivalCheck.remove();
                 player.elevatorClickTimer = null;
+                player.setState(PlayerState.WAITING_FOR_ELEVATOR);
                 this.elevatorManager.requestElevator(player, targetFloor);
             }
         }
@@ -325,34 +334,32 @@ onElevatorZoneClicked(targetFloor, player) {
         this.players.forEach(({ player, sprite }) => {
             // Update player status (thirst, hunger, sleep)
             player.updateStatus(dt);
-            
+
             // Handle automated NPC behavior
-            if (player.isAutomated && player !== this.selectedPlayer && !player.waitingForElevator && !player.inElevator) {
-                // If they have a player-commanded movement, use normal movement
-                if (player.playerCommandedMovement && player.targetX !== null) {
-                    const previousTargetX = player.targetX;
-                    player.moveTowardTarget(dt);
-                    // Check if they just reached their destination
-                    if (previousTargetX !== null && player.targetX === null) {
-                        player.playerCommandedMovement = false;
-                        player.isIdling = true;
+            if (player.isAutomated && player !== this.selectedPlayer &&
+                !player.isAnyOf(PlayerState.WAITING_FOR_ELEVATOR, PlayerState.IN_ELEVATOR)) {
+
+                if (player.is(PlayerState.WALKING) && player.targetX !== null) {
+                    // Player-commanded movement (from before automation was re-enabled)
+                    const reached = player.moveTowardTarget(dt);
+                    if (reached) {
+                        player.setState(PlayerState.AUTOMATED_IDLE);
                         player.idleTimer = 0;
                         player.idleDuration = 1 + Math.random() * 2;
                     }
-                } else if (player.playerCommandedMovement && player.targetX === null) {
-                    // Edge case: playerCommandedMovement is true but targetX is already null
-                    player.playerCommandedMovement = false;
-                    player.isIdling = true;
+                } else if (player.is(PlayerState.WALKING) && player.targetX === null) {
+                    // Edge case: WALKING but targetX already null
+                    player.setState(PlayerState.AUTOMATED_IDLE);
                     player.idleTimer = 0;
                     player.idleDuration = 1 + Math.random() * 2;
                 } else {
                     this.updateAutomatedBehavior(player, dt);
                 }
             } else {
-                // Regular player movement
+                // Regular player movement (selected player or non-automated)
                 player.moveTowardTarget(dt);
             }
-            
+
             this.checkWallCollision(player, sprite);
             sprite.update();
         });
@@ -363,11 +370,6 @@ onElevatorZoneClicked(targetFloor, player) {
             if (Math.abs(dx) > 0.1) {
                 this.doorManager.tryOpenDoor(player, dx);
             }
-
-            // Reset if player stops moving or exits door area
-            if (Math.abs(dx) < 0.1 && player.hasEnteredDoor) {
-                player.hasEnteredDoor = false;
-            }
         });
 
         if (this.selectionPointer) {
@@ -375,7 +377,7 @@ onElevatorZoneClicked(targetFloor, player) {
                 this.selectionPointer.setVisible(true);
                 this.selectionPointer.x = this.selectedPlayer.x;
                 this.selectionPointer.y = this.selectedPlayer.y - 48; // adjust for head height
-                if(this.selectedPlayer.inElevator)
+                if (this.selectedPlayer.is(PlayerState.IN_ELEVATOR))
                      this.selectionPointer.setVisible(false);
             } else {
                 this.selectionPointer.setVisible(false);
@@ -389,67 +391,63 @@ onElevatorZoneClicked(targetFloor, player) {
     }
 
     updateAutomatedBehavior(player, dt) {
-        if (player.isIdling) {
+        if (player.is(PlayerState.AUTOMATED_IDLE)) {
             // Handle idle state - NPC is stationary
             player.vx = 0;
-            player.isWalking = false;
             player.idleTimer += dt;
-            
+
             if (player.idleTimer >= player.idleDuration) {
                 // End idle period and start moving
-                player.isIdling = false;
                 player.idleTimer = 0;
                 const distance = 60 + Math.random() * 120; // Random movement distance
                 let newTargetX = player.x + (player.direction * distance);
-                
+
                 // If new target would be out of bounds, reverse direction
                 if (newTargetX <= player.minX || newTargetX >= player.maxX) {
                     player.direction *= -1;
                     newTargetX = player.x + (player.direction * distance);
                 }
-                
+
                 // Clamp target within boundaries
                 player.targetX = Math.max(player.minX + 10, Math.min(player.maxX - 10, newTargetX));
-                player.playerCommandedMovement = false; // This is automated movement
+                player.setState(PlayerState.AUTOMATED_WALKING);
             }
-        } else if (player.targetX !== null) {
+        } else if (player.is(PlayerState.AUTOMATED_WALKING) && player.targetX !== null) {
             // Move toward target using slower automated speed
             const originalSpeed = player.speed;
             player.speed = player.automatedSpeed;
             player.moveTowardTarget(dt);
             player.speed = originalSpeed; // Restore original speed
-            
+
             // Check if reached target or boundaries
             const reachedTarget = Math.abs(player.x - player.targetX) < 5;
             const hitBoundary = player.x <= player.minX + 5 || player.x >= player.maxX - 5;
-            
+
             if (reachedTarget || hitBoundary) {
                 // Stop and start idle period
                 player.targetX = null;
                 player.vx = 0;
-                player.isWalking = false;
-                player.isIdling = true;
+                player.setState(PlayerState.AUTOMATED_IDLE);
                 player.idleTimer = 0;
                 player.idleDuration = 1.5 + Math.random() * 3; // Random idle time between 1.5-4.5 seconds
-                
+
                 // If hit boundary, reverse direction for next movement
                 if (hitBoundary) {
                     player.direction *= -1;
                 }
             }
-            
+
             // Small random chance to stop and idle mid-movement
             if (Math.random() < 0.003) {
                 player.targetX = null;
                 player.vx = 0;
-                player.isWalking = false;
-                player.isIdling = true;
+                player.setState(PlayerState.AUTOMATED_IDLE);
                 player.idleTimer = 0;
                 player.idleDuration = 1 + Math.random() * 2;
             }
         } else {
-            // Safety fallback - shouldn't happen, but just in case
-            player.isIdling = true;
+            // Safety fallback — force into automated idle
+            player.forceState(PlayerState.AUTOMATED_IDLE);
             player.idleTimer = 0;
             player.idleDuration = 1 + Math.random() * 2;
         }
@@ -482,15 +480,14 @@ onElevatorZoneClicked(targetFloor, player) {
 
             player.vx = 0;
             player.targetX = null;
-            // Clear the playerCommandedMovement flag since they can't reach their destination
-            if (player.playerCommandedMovement) {
-                player.playerCommandedMovement = false;
-                // If automated, transition to idle
-                if (player.isAutomated) {
-                    player.isIdling = true;
-                    player.idleTimer = 0;
-                    player.idleDuration = 1 + Math.random() * 2;
-                }
+
+            // Transition to appropriate idle state
+            if (player.isAutomated) {
+                player.forceState(PlayerState.AUTOMATED_IDLE);
+                player.idleTimer = 0;
+                player.idleDuration = 1 + Math.random() * 2;
+            } else if (!player.isAnyOf(PlayerState.WAITING_FOR_ELEVATOR, PlayerState.IN_ELEVATOR)) {
+                player.forceState(PlayerState.IDLE);
             }
         }
     });
@@ -512,9 +509,8 @@ getClickedFloorIndex(y) {
         }
     }
 
-    console.log("→ No valid floor clicked");
     return -1;
 }
 
 
-} 
+}
